@@ -1,0 +1,54 @@
+name: lab-orbit-dev
+services:
+  backend:
+    build:
+      context: ${SOURCE_DIR}
+      dockerfile: ${DEPLOY_DIR}/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${BACKEND_PORT}:8000"
+    environment:
+      LABHUB_DB_PATH: /app/data/labhub.db
+      LABHUB_SECRET_KEY: ${LABHUB_SECRET_KEY}
+      LABHUB_INVITE_CODE: ${LABHUB_INVITE_CODE}
+      SEED_DEMO_DATA: "0"
+      WATCHFILES_FORCE_POLLING: "true"
+      WATCHFILES_POLL_DELAY_MS: "500"
+    volumes:
+      - ${SOURCE_DIR}/backend:/app/backend
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 30s
+  frontend:
+    image: node:22-bookworm-slim
+    working_dir: /app/frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT}:5173"
+    environment:
+      VITE_DEMO_MODE: "false"
+      VITE_API_URL: ""
+      GITHUB_PAGES: "false"
+      VITE_GITHUB_PAGES: "false"
+    volumes:
+      - ${SOURCE_DIR}/frontend:/app/frontend
+      - ${SOURCE_DIR}/backend:/app/backend:ro
+      - frontend_dependencies:/app/frontend/node_modules
+      - ./docker.vite.config.mjs:/app/frontend/docker.vite.config.mjs:ro
+      - ./frontend-start.sh:/opt/frontend-start.sh:ro
+    command: ["sh", "/opt/frontend-start.sh"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 6s
+      retries: 6
+      start_period: 180s
+volumes:
+  frontend_dependencies:

@@ -1,0 +1,37 @@
+
+/* Sidebar navigation: pressed and selected share the same inset effect. */
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) {
+  transform: none;
+  background: var(--raised) !important;
+  color: var(--accent) !important;
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-icon {
+  transform: none;
+  color: var(--accent) !important;
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-icon :deep(svg) {
+  transform: scale(0.96);
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-icon :deep(svg:not([fill="none"])) {
+  fill: var(--accent) !important;
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-icon :deep(svg[fill="none"]) {
+  stroke: var(--accent) !important;
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-layer:nth-of-type(1) {
+  opacity: 0.3;
+  transform: translate(0, 0);
+  background: var(--raised) !important;
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-layer:nth-of-type(2) {
+  opacity: 0.55;
+  transform: translate(3px, -3px);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+}
+.sidebar-links > .sidebar-link.iso-pro:is(:active, .router-link-exact-active) .iso-layer:nth-of-type(3) {
+  opacity: 0.85;
+  transform: translate(6px, -6px);
+  border-color: var(--accent) !important;
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.42),
+              inset 0 -1px 2px color-mix(in srgb, var(--accent) 20%, transparent) !important;
+}

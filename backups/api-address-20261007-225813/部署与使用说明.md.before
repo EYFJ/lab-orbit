@@ -1,0 +1,90 @@
+# LabOrbit Docker 开发环境使用说明
+
+## 文件夹与运行方式
+
+- 源码：C:\Users\QW201\Desktop\项目\lab-orbit-1.1。日常在这里编辑代码。
+- 部署：C:\Users\QW201\Desktop\项目\lab-orbit-docker。配置、操作脚本、数据库和备份集中在这里。
+- frontend：Node 22 + Vite 开发服务，端口 5173。
+- backend：Python 3.11 + FastAPI，端口 8000。
+- 前端的普通 /api 请求通过 Docker 内部地址 backend:8000 转发；原项目中的外部专用代理保持原配置。
+- data/labhub.db：全新 SQLite 数据库。用户上传的附件也在数据库里。
+- 前端容器额外只读挂载后端源码，以支持项目中跨前后端的测试；后端仍由 backend 容器运行。
+- Docker 命名卷 frontend_dependencies：容器里的前端依赖，与 Windows 源码依赖分开。
+- Docker 开发配置通过独立挂载的 docker.vite.config.mjs 扩展原项目配置。
+
+这是本机开发环境，服务仅绑定 127.0.0.1。前端运行 Vite 开发服务器，不是公网生产部署。
+
+## 每天如何启动
+
+先打开 Docker Desktop，等待引擎就绪，然后双击本文件夹的 start.cmd。也可以在本文件夹打开 PowerShell，执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\启动.ps1
+```
+
+浏览器访问 http://localhost:5173 。首次打开 http://localhost:5173/setup 填写管理员和课题组信息，设置自己的密码和邀请码。系统不会创建默认管理员，也不会导入演示账号或旧数据库。
+
+容器启用 unless-stopped：正常运行的容器可随 Docker 引擎启动恢复；手动停止过的服务需要再次运行启动脚本。
+
+## 修改代码
+
+- 修改 frontend/src 中的 Vue、JavaScript、CSS 文件并保存，Vite 会通知浏览器更新；部分修改会刷新整页。
+- 修改 backend 中的 Python 文件并保存，后端自动重启，短暂重载后再次请求即可。
+- 前后端均使用轮询检测 Windows 挂载目录的变化。
+- 不需要在 Windows 上单独运行 npm、Python 或启动原项目脚本。
+- 前端依赖变化：在容器中执行依赖添加，例如：
+  docker compose exec frontend npm install 依赖名称
+  这会更新源码的 package.json 和 package-lock.json；之后运行“更新前端依赖.ps1”。
+- 已修改两个依赖文件时，运行“更新前端依赖.ps1”，容器会自动比较依赖摘要并执行 npm ci。二者必须一致。
+- 修改 backend/requirements.txt、Python 版本或系统组件后，运行“重建环境.ps1”。
+- 修改 Compose、环境变量或 Node 镜像版本后，运行“重建环境.ps1”。
+- 修改源码数据库结构时仍需按项目迁移规则处理，自动重载不会替你设计数据库迁移。
+
+## 常用操作
+
+也可以双击 stop.cmd（停止）、logs.cmd（日志）、rebuild.cmd（重建）、update-deps.cmd（更新前端依赖）、backup.cmd（备份）。入口执行后保留窗口方便查看结果。
+
+在本文件夹中运行：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\停止.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\查看日志.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\重建环境.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\更新前端依赖.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\备份数据.ps1
+```
+
+查看日志时按 Ctrl+C 退出，不会停止服务。首次构建需要网络下载镜像和依赖，耗时比后续启动长。
+
+## 配置与数据保护
+
+.env 包含源码位置、部署位置、端口、随机签名密钥和初始邀请码。首次向导里的邀请码由你填写并保存。不要把 .env 或数据库公开提交。
+移动文件夹后必须更新 .env 的 SOURCE_DIR、DEPLOY_DIR，再重建环境。
+停止和重建容器都不会清空 data；不要删除 data 文件夹。
+部署目录自带 .gitignore 排除密钥、数据库、备份。
+
+## 备份与恢复
+
+运行“备份数据.ps1”会先停止两项服务，将完整 data 目录和 .env 复制到 backups/时间戳，然后启动服务。备份也包含敏感信息。
+
+恢复：
+1. 运行“停止.ps1”。
+2. 将当前 data 文件夹改名保留，避免覆盖现有数据。
+3. 将选定 backups/时间戳/data 文件夹复制到部署目录，确保最终路径是 data/labhub.db。
+4. 如需恢复相同签名密钥和环境配置，复制该备份的 .env；如果目录改变，同时修正路径。
+5. 运行“启动.ps1”，确认原账号、记录和附件可用。
+
+不要在运行时直接复制单个数据库文件，因为 SQLite 可能正在写入。
+
+## 排查问题
+
+- 找不到 Docker 或无法连接：打开 Docker Desktop，确认 Linux 引擎就绪；脚本兼容当前用户安装位置和标准安装位置。
+- 端口占用：在 .env 修改 FRONTEND_PORT 或 BACKEND_PORT，再重建环境；浏览器地址跟随 FRONTEND_PORT 改变。
+- 前端 API 报错：查看 backend 日志、健康状态及 frontend 日志；Docker 内部使用 backend:8000，不使用宿主机 localhost。
+- 自动更新失效：检查 .env 指向实际编辑的源码；查看服务日志，重启相应服务后刷新浏览器。
+- 安装依赖失败：检查镜像仓库、npm 和 pip 网络访问，以及 package-lock.json 与 package.json 是否一致。
+- 前端依赖出现异常：停止服务，保留数据，仅处理名为 lab-orbit-dev_frontend_dependencies 的依赖卷，然后启动重新安装；不要删除 data。
+- 看到演示数据：确认访问的是本部署地址，并清理该地址下浏览器旧缓存。本配置明确关闭演示模式。
+
+## 验收结果
+
+具体构建、测试、热更新和数据持久化结果见同目录的“验收结果.md”。
